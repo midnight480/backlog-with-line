@@ -1,0 +1,6 @@
+node_modules
+cdk.out
+*.d.ts
+!lambda/**/*.d.ts
+.env
+.DS_Store
