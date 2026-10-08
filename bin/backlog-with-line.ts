@@ -6,6 +6,6 @@ const app = new cdk.App();
 new BacklogWithLineStack(app, 'BacklogWithLineStack', {
   env: {
     account: process.env.CDK_DEFAULT_ACCOUNT,
-    region: process.env.CDK_DEFAULT_REGION ?? 'ap-northeast-1',
+    region: process.env.CDK_DEFAULT_REGION ?? 'us-west-2',
   },
 });

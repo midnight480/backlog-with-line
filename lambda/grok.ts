@@ -6,7 +6,7 @@ import {
 const client = new BedrockRuntimeClient({
   region: process.env.BEDROCK_REGION ?? 'us-west-2',
 });
-const MODEL_ID = process.env.BEDROCK_MODEL_ID ?? 'us.xai.grok-4.6';
+const MODEL_ID = process.env.BEDROCK_MODEL_ID ?? 'xai.grok-4.6';
 
 export interface IssueDraft {
   summary: string;

@@ -83,7 +83,9 @@ aws ssm put-parameter --name /backlog-with-line/line/liff-id \
 cdk deploy
 ```
 
-Outputs の `FunctionUrl`（例: `https://xxxx.lambda-url.ap-northeast-1.on.aws/`）を控える。
+Outputs の `FunctionUrl`（例: `https://xxxx.lambda-url.us-west-2.on.aws/`）を控える。
+
+> このプロジェクトは **us-west-2** にデプロイする前提です（Grok 4.6 の提供リージョンに合わせ、BedrockをIn-Regionで直接呼ぶ構成）。`cdk bootstrap` も us-west-2 で実行してください。
 
 ## E. Backlog側の準備
 

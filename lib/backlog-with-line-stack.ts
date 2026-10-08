@@ -9,9 +9,10 @@ import type { Construct } from 'constructs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-// Grok 4.6 on Bedrock は us-west-2 の推論プロファイル経由で呼び出す
+// Grok 4.6 on Bedrock は us-west-2 で提供。スタック自体も us-west-2 に置き
+// In-Region で直接呼び出す（推論プロファイル経由のクロスリージョンを避ける）
 const BEDROCK_REGION = 'us-west-2';
-const BEDROCK_MODEL_ID = 'us.xai.grok-4.6';
+const BEDROCK_MODEL_ID = 'xai.grok-4.6';
 const PARAM_PREFIX = '/backlog-with-line';
 
 export class BacklogWithLineStack extends cdk.Stack {
@@ -55,15 +56,12 @@ export class BacklogWithLineStack extends cdk.Stack {
       }),
     );
 
-    // Bedrock: 推論プロファイル + 配送先リージョンの基盤モデル
+    // Bedrock: In-Region の基盤モデル直接呼び出し
     fn.addToRolePolicy(
       new iam.PolicyStatement({
         actions: ['bedrock:InvokeModel'],
         resources: [
-          `arn:aws:bedrock:${BEDROCK_REGION}:${this.account}:inference-profile/${BEDROCK_MODEL_ID}`,
-          ...['us-east-1', 'us-east-2', 'us-west-2'].map(
-            (r) => `arn:aws:bedrock:${r}::foundation-model/xai.grok-4.6`,
-          ),
+          `arn:aws:bedrock:${BEDROCK_REGION}::foundation-model/${BEDROCK_MODEL_ID}`,
         ],
       }),
     );
