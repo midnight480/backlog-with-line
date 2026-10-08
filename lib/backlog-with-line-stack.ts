@@ -32,8 +32,6 @@ export class BacklogWithLineStack extends cdk.Stack {
       runtime: lambda.Runtime.NODEJS_22_X,
       timeout: cdk.Duration.seconds(30),
       memorySize: 512,
-      // 公開URLなので悪用時のコスト上限として同時実行数を絞る
-      reservedConcurrentExecutions: 10,
       environment: {
         TABLE_NAME: table.tableName,
         PARAM_PREFIX,
