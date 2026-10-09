@@ -73,6 +73,17 @@ app.post('/webhook/line', async (c) => {
   if (!ok) return c.json({ error: 'invalid signature' }, 401);
 
   const { events = [] } = JSON.parse(body);
+  console.log(
+    'line webhook',
+    JSON.stringify(
+      events.map((e: any) => ({
+        type: e.type,
+        src: e.source?.type,
+        msg: e.message?.type,
+        mention: e.message?.mention?.mentionees?.map((m: any) => m.isSelf),
+      })),
+    ),
+  );
   const token = await getParam('line/channel-access-token');
   const baseUrl = `https://${c.req.header('host')}`;
 

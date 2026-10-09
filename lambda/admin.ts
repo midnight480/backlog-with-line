@@ -285,7 +285,7 @@ function renderConnect(cfg) {
       body: JSON.stringify({ idToken, groupId, ...v }) });
     const j = await res.json();
     if (j.error) { $('#out').innerHTML = msg(j.error, true); return; }
-    renderDetail({ spaceUrl: v.spaceUrl.replace(/\/$/,''), projectKey: v.projectKey.toUpperCase() }, j.meta, j.webhookUrl);
+    renderDetail({ spaceUrl: v.spaceUrl.replace(/[/]+$/,''), projectKey: v.projectKey.toUpperCase() }, j.meta, j.webhookUrl);
   };
 }
 
@@ -313,7 +313,7 @@ function renderDetail(cfg, meta, webhookUrl) {
     const res = await fetch('/admin/api/config', { method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({ idToken, groupId, ...formVals(), notifyComment: !!$('[name=notifyComment]')?.checked }) });
     const j = await res.json();
-    $('#out').innerHTML = j.error ? msg(j.error, true) : '<div class="msg">保存しました\nWebhook URL: '+esc(j.webhookUrl)+'</div>';
+    $('#out').innerHTML = j.error ? msg(j.error, true) : '<div class="msg">保存しました\\nWebhook URL: '+esc(j.webhookUrl)+'</div>';
     if (!j.error) renderSettings();
   };
   $('#reconnect').onclick = () => renderConnect(cfg);
@@ -352,16 +352,24 @@ async function renderDraft(draftId) {
   };
 }
 
+const show = (t) => { app.innerHTML = t; };
+const timeout = (ms, label) => new Promise((_, rj) => setTimeout(() => rj(new Error(label+'がタイムアウトしました')), ms));
+
 (async () => {
-  if (!LIFF_ID) { app.innerHTML = '<div class="msg err">LIFF ID が未設定です（SSM: line/liff-id）</div>'; return; }
-  await liff.init({ liffId: LIFF_ID });
+  show('LIFF ID確認中...');
+  if (!LIFF_ID) { show(msg('LIFF ID が未設定です（SSM: line/liff-id）', true)); return; }
+  show('LIFF初期化中...');
+  await Promise.race([liff.init({ liffId: LIFF_ID }), timeout(20000, 'LIFF初期化')]);
+  if (!liff.isLoggedIn()) { show(msg('LINEにログインしていません', true)); return; }
   idToken = liff.getIDToken() || '';
+  if (!idToken) { show(msg('IDトークンが取得できません（LIFFのopenidスコープを確認）', true)); return; }
   const ctx = liff.getContext();
   groupId = ctx && ctx.groupId || ctx && ctx.roomId || '';
-  if (!groupId) { app.innerHTML = '<div class="msg err">グループ内のリンクから開いてください</div>'; return; }
+  if (!groupId) { show(msg('グループ内のリンクから開いてください（コンテキスト: '+esc(ctx?.type||'なし')+'）', true)); return; }
+  show('設定を取得中...');
   const draftId = new URLSearchParams(location.search).get('draft');
   if (draftId) await renderDraft(draftId); else await renderSettings();
-})().catch(e => { app.innerHTML = '<div class="msg err">'+esc(e.message)+'</div>'; });
+})().catch(e => { show('<div class="msg err">'+esc(e && e.message || String(e))+'</div>'); });
 </script>
 </body>
 </html>`);
