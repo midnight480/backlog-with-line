@@ -25,12 +25,15 @@ export const adminApp = new Hono();
 async function authGroup(
   idToken: string,
   groupId: string,
-): Promise<string | null> {
+): Promise<{ userId: string } | { error: string }> {
   const channelId = await getParam('line/channel-id');
   const userId = await verifyIdToken(idToken, channelId);
-  if (!userId) return null;
+  if (!userId) return { error: 'invalid_id_token' };
   const token = await getParam('line/channel-access-token');
-  return (await isGroupMember(token, groupId, userId)) ? userId : null;
+  if (!(await isGroupMember(token, groupId, userId))) {
+    return { error: 'not_group_member' };
+  }
+  return { userId };
 }
 
 const baseUrl = (c: { req: { header: (n: string) => string | undefined } }) =>
@@ -40,7 +43,8 @@ const baseUrl = (c: { req: { header: (n: string) => string | undefined } }) =>
 adminApp.get('/api/config', async (c) => {
   const groupId = c.req.query('groupId') ?? '';
   const idToken = c.req.query('idToken') ?? '';
-  if (!(await authGroup(idToken, groupId))) return c.json({ error: 'unauthorized' }, 401);
+  const auth = await authGroup(idToken, groupId);
+  if ('error' in auth) return c.json({ error: auth.error }, 401);
 
   const cfg = await getGroupConfig(groupId);
   let meta: Record<string, unknown> = {};
@@ -65,13 +69,54 @@ adminApp.get('/api/config', async (c) => {
   });
 });
 
+// ---- 接続テスト（第1段階：spaceUrl + APIキー + projectKey で疎通確認してメタ情報を返す） ----
+adminApp.post('/api/connect', async (c) => {
+  const body = await c.req.json();
+  const { idToken, groupId } = body;
+  const auth = await authGroup(idToken, groupId ?? '');
+  if ('error' in auth) return c.json({ error: auth.error }, 401);
+
+  const spaceUrl = String(body.spaceUrl ?? '').replace(/\/$/, '');
+  const projectKey = String(body.projectKey ?? '').toUpperCase();
+  if (!spaceUrl || !projectKey || !body.backlogApiKey) {
+    return c.json({ error: 'spaceUrl / projectKey / APIキーは必須です' }, 400);
+  }
+  await putParam(`groups/${groupId}/backlog-api-key`, body.backlogApiKey);
+
+  const prev = await getGroupConfig(groupId);
+  const cfg: GroupConfig = {
+    groupId,
+    spaceUrl,
+    projectKey,
+    webhookToken: prev?.webhookToken ?? crypto.randomUUID(),
+    notifyTypes: prev?.notifyTypes ?? [3],
+    priorityId: prev?.priorityId ?? 3,
+  };
+  try {
+    await getMyself(cfg); // APIキー検証
+    const issueTypes = await listIssueTypes(cfg); // projectId解決を兼ねる
+    const [priorities, users] = await Promise.all([
+      listPriorities(cfg),
+      listProjectUsers(cfg),
+    ]);
+    await putGroupConfig(cfg);
+    await putWebhookToken(cfg.webhookToken, groupId);
+    return c.json({
+      ok: true,
+      meta: { issueTypes, priorities, users },
+      webhookUrl: `${baseUrl(c)}/webhook/backlog/${cfg.webhookToken}`,
+    });
+  } catch (e) {
+    return c.json({ error: `Backlog接続に失敗: ${(e as Error).message}` }, 400);
+  }
+});
+
 // ---- 設定の保存 ----
 adminApp.post('/api/config', async (c) => {
   const body = await c.req.json();
   const { idToken, groupId } = body;
-  if (!groupId || !(await authGroup(idToken, groupId))) {
-    return c.json({ error: 'unauthorized' }, 401);
-  }
+  const auth = await authGroup(idToken, groupId ?? '');
+  if ('error' in auth) return c.json({ error: auth.error }, 401);
 
   if (body.backlogApiKey) {
     await putParam(`groups/${groupId}/backlog-api-key`, body.backlogApiKey);
@@ -128,7 +173,8 @@ adminApp.get('/api/draft', async (c) => {
   const id = c.req.query('id') ?? '';
   const groupId = c.req.query('groupId') ?? '';
   const idToken = c.req.query('idToken') ?? '';
-  if (!(await authGroup(idToken, groupId))) return c.json({ error: 'unauthorized' }, 401);
+  const auth = await authGroup(idToken, groupId);
+  if ('error' in auth) return c.json({ error: auth.error }, 401);
   const pend = await getPending(id);
   if (!pend || pend.kind !== 'draft') return c.json({ error: '期限切れです' }, 404);
   const cfg = await getGroupConfig(groupId);
@@ -146,7 +192,8 @@ adminApp.get('/api/draft', async (c) => {
 adminApp.post('/api/draft/submit', async (c) => {
   const body = await c.req.json();
   const { id, idToken, groupId } = body;
-  if (!(await authGroup(idToken, groupId))) return c.json({ error: 'unauthorized' }, 401);
+  const auth = await authGroup(idToken, groupId ?? '');
+  if ('error' in auth) return c.json({ error: auth.error }, 401);
   const pend = await getPending(id);
   const cfg = await getGroupConfig(groupId);
   if (!pend || !cfg) return c.json({ error: '期限切れか未設定です' }, 404);
@@ -214,36 +261,71 @@ function selectField(label, name, options, current) {
 }
 const formVals = () => Object.fromEntries(new FormData($('form')).entries());
 
-async function renderSettings() {
-  const q = new URLSearchParams({ groupId, idToken });
-  const data = await (await fetch('/admin/api/config?'+q)).json();
-  const cfg = data.config || {};
-  const meta = data.meta || {};
+const ERR_JA = {
+  invalid_id_token: 'LINEログイン確認に失敗しました（LIFFのopenidスコープを確認してください）',
+  not_group_member: 'グループメンバーとして確認できません。ボットをこのグループに招待してから開き直してください',
+  unauthorized: '認証に失敗しました',
+};
+const msg = (t, err) => '<div class="msg'+(err?' err':'')+'">'+esc(ERR_JA[t]||t)+'</div>';
+
+// ---- Step1: 接続テスト ----
+function renderConnect(cfg) {
   app.innerHTML = '<h1>Backlog連携 設定</h1>'
+    + '<p style="font-size:13px;color:#555">まず Backlog との接続を確認します</p>'
     + '<form>'
     + field('Backlog スペースURL','spaceUrl',cfg.spaceUrl,'url','https://xxx.backlog.com')
-    + field('Backlog APIキー'+(data.hasApiKey?'（設定済・変更時のみ入力）':''),'backlogApiKey','','password')
+    + field('Backlog APIキー','backlogApiKey','','password')
     + field('プロジェクトキー','projectKey',cfg.projectKey,'text','SAGA')
+    + '<button type="submit">接続テスト</button></form><div id="out"></div>';
+  $('form').onsubmit = async (e) => {
+    e.preventDefault();
+    $('#out').innerHTML = '接続中...';
+    const v = formVals();
+    const res = await fetch('/admin/api/connect', { method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ idToken, groupId, ...v }) });
+    const j = await res.json();
+    if (j.error) { $('#out').innerHTML = msg(j.error, true); return; }
+    renderDetail({ spaceUrl: v.spaceUrl.replace(/\/$/,''), projectKey: v.projectKey.toUpperCase() }, j.meta, j.webhookUrl);
+  };
+}
+
+// ---- Step2: 詳細設定（接続成功後にBacklogから取れた選択肢で表示） ----
+function renderDetail(cfg, meta, webhookUrl) {
+  const users = (meta.users||[]).map(u=>({id:u.id,name:u.name}));
+  app.innerHTML = '<h1>Backlog連携 設定</h1>'
+    + '<div class="msg">接続OK: '+esc(cfg.spaceUrl)+' / '+esc(cfg.projectKey)+'</div>'
+    + '<form>'
     + selectField('課題タイプ','issueTypeId',meta.issueTypes||[],cfg.issueTypeId)
     + selectField('優先度','priorityId',meta.priorities||[],cfg.priorityId||3)
-    + selectField('デフォルト担当者','assigneeId',(meta.users||[]).map(u=>({id:u.id,name:u.name})),cfg.assigneeId)
+    + selectField('デフォルト担当者','assigneeId',users,cfg.assigneeId)
     + field('期限のデフォルト（日数・空なら未指定）','dueDays',cfg.dueDays??'','number')
     + '<label>起票テンプレート指示（任意）</label><textarea name="template" placeholder="例: 詳細は【概要】【再現手順】【期待結果】の見出しで整理する">'+esc(cfg.template||'')+'</textarea>'
     + '<label><input type="checkbox" name="notifyComment" '+(cfg.notifyTypes?.length?'checked':'')+' style="width:auto"> Backlogコメントをこのグループに通知</label>'
     + '<h2>LINE発言のミラー</h2>'
     + selectField('ミラーモード','mirrorMode',[{id:'off',name:'しない'},{id:'weekly',name:'週次ログ課題に記録'},{id:'fixed',name:'固定課題に記録'}],cfg.mirrorMode||'off')
     + field('固定課題キー（固定の場合）','mirrorIssueKey',cfg.mirrorIssueKey,'text','SAGA-123')
-    + selectField('ミラー時のお知らせ先','mirrorNotifyUserId',(meta.users||[]).map(u=>({id:u.id,name:u.name})),cfg.mirrorNotifyUserId)
-    + '<button type="submit">保存</button></form><div id="out"></div>'
-    + (data.webhookUrl ? '<h2>Backlog Webhook URL</h2><div class="msg">'+esc(data.webhookUrl)+'</div><p style="font-size:12px;color:#777">Backlogプロジェクト設定 → Webhook に登録してください</p>' : '');
+    + selectField('ミラー時のお知らせ先','mirrorNotifyUserId',users,cfg.mirrorNotifyUserId)
+    + '<button type="submit">保存</button></form>'
+    + '<button type="button" id="reconnect" style="background:#888;margin-top:8px">接続設定を変更</button><div id="out"></div>'
+    + (webhookUrl ? '<h2>Backlog Webhook URL</h2><div class="msg">'+esc(webhookUrl)+'</div><p style="font-size:12px;color:#777">Backlogプロジェクト設定 → Webhook に登録してください</p>' : '');
   $('form').onsubmit = async (e) => {
     e.preventDefault();
     const res = await fetch('/admin/api/config', { method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({ idToken, groupId, ...formVals(), notifyComment: !!$('[name=notifyComment]')?.checked }) });
     const j = await res.json();
-    $('#out').innerHTML = '<div class="msg'+(j.error?' err':'')+'">'+esc(j.error||('保存しました\\nWebhook URL: '+j.webhookUrl))+'</div>';
+    $('#out').innerHTML = j.error ? msg(j.error, true) : '<div class="msg">保存しました\nWebhook URL: '+esc(j.webhookUrl)+'</div>';
     if (!j.error) renderSettings();
   };
+  $('#reconnect').onclick = () => renderConnect(cfg);
+}
+
+async function renderSettings() {
+  const q = new URLSearchParams({ groupId, idToken });
+  const res = await fetch('/admin/api/config?'+q);
+  const data = await res.json();
+  if (data.error) { app.innerHTML = msg(data.error, true); return; }
+  if (!data.config) { renderConnect({}); return; }
+  renderDetail(data.config, data.meta || {}, data.webhookUrl);
 }
 
 async function renderDraft(draftId) {
