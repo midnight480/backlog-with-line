@@ -113,8 +113,8 @@ async function handleEvent(ev: any, ctx: Ctx) {
   if (ev.type === 'join' && ev.replyToken) {
     const liffId = await getParamOrNull('line/liff-id');
     const adminUrl = liffId
-      ? `https://liff.line.me/${liffId}`
-      : `${ctx.baseUrl}/admin`;
+      ? `https://liff.line.me/${liffId}/?group=${groupId}`
+      : `${ctx.baseUrl}/admin?group=${groupId}`;
     await line.lineReply(ctx.token, ev.replyToken, [
       line.textMsg(
         'Backlog連携ボットです。\n\n' +
@@ -283,8 +283,8 @@ async function onText(
   if (!cfg) {
     const liffId = await getParamOrNull('line/liff-id');
     const adminUrl = liffId
-      ? `https://liff.line.me/${liffId}`
-      : `${ctx.baseUrl}/admin`;
+      ? `https://liff.line.me/${liffId}/?group=${groupId}`
+      : `${ctx.baseUrl}/admin?group=${groupId}`;
     await line.lineReply(ctx.token, ev.replyToken, [
       line.textMsg(
         `このグループはまだBacklogと紐付いていません。設定画面で登録してください:\n${adminUrl}`,
@@ -373,7 +373,7 @@ async function onPostback(
           ? [
               {
                 label: 'フォームで修正',
-                uri: `https://liff.line.me/${liffId}/?draft=${pid}`,
+                uri: `https://liff.line.me/${liffId}/?draft=${pid}&group=${groupId}`,
               },
             ]
           : []),

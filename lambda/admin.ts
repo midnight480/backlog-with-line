@@ -374,7 +374,10 @@ const timeout = (ms, label) => new Promise((_, rj) => setTimeout(() => rj(new Er
   idToken = liff.getIDToken() || '';
   if (!idToken) { show(msg('IDトークンが取得できません（LIFFのopenidスコープを確認）', true)); return; }
   const ctx = liff.getContext();
-  groupId = ctx && ctx.groupId || ctx && ctx.roomId || '';
+  // LIFFコンテキストのgroupIdはLINE LoginチャネルのスコープでWebhook側と異なるため、
+  // ボット投稿リンクの ?group= パラメータ（Webhookスコープ）を優先する
+  groupId = new URLSearchParams(location.search).get('group')
+    || ctx && ctx.groupId || ctx && ctx.roomId || '';
   if (!groupId) { show(msg('グループ内のリンクから開いてください（コンテキスト: '+esc(ctx?.type||'なし')+'）', true)); return; }
   show('設定を取得中...');
   const draftId = new URLSearchParams(location.search).get('draft');
