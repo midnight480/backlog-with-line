@@ -9,10 +9,10 @@ import type { Construct } from 'constructs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-// Grok 4.6 on Bedrock は us-west-2 で提供。スタック自体も us-west-2 に置き
-// In-Region で直接呼び出す（推論プロファイル経由のクロスリージョンを避ける）
+// Bedrock は us-west-2 に集約。デフォルトは Claude Haiku 4.5
+// （xai.grok-4.6 はアカウントによって開放されないため。変更はここを書き換えて再デプロイ）
 const BEDROCK_REGION = 'us-west-2';
-const BEDROCK_MODEL_ID = 'xai.grok-4.6';
+const BEDROCK_MODEL_ID = 'us.anthropic.claude-haiku-4-5-20251001-v1:0';
 const PARAM_PREFIX = '/backlog-with-line';
 
 export class BacklogWithLineStack extends cdk.Stack {
@@ -56,12 +56,14 @@ export class BacklogWithLineStack extends cdk.Stack {
       }),
     );
 
-    // Bedrock: In-Region の基盤モデル直接呼び出し
+    // Bedrock: 推論プロファイル（クロスリージョンで基盤モデルに流れる）と
+    // In-Region直接呼び出しの両方を許可。モデル差し替え時のIAM変更を不要にするためワイルドカード
     fn.addToRolePolicy(
       new iam.PolicyStatement({
         actions: ['bedrock:InvokeModel'],
         resources: [
-          `arn:aws:bedrock:${BEDROCK_REGION}::foundation-model/${BEDROCK_MODEL_ID}`,
+          `arn:aws:bedrock:${BEDROCK_REGION}:${this.account}:inference-profile/*`,
+          'arn:aws:bedrock:*::foundation-model/*',
         ],
       }),
     );

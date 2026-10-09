@@ -65,7 +65,8 @@
 ## D. AWS 側（先にここまで終わらせる）
 
 ```bash
-# Bedrock コンソール(us-west-2) → モデルアクセス → Grok 4.6 を有効化（初回のみ・数分で反映）
+# Bedrock コンソール(us-west-2) → モデルアクセス → Claude Haiku 4.5 を有効化（初回のみ・数分で反映）
+# （xAI Grok 4.6 はアカウントによって開放されないため。使える場合は lib の BEDROCK_MODEL_ID を変更）
 # https://us-west-2.console.aws.amazon.com/bedrock/home?region=us-west-2#/modelaccess
 
 cdk bootstrap   # そのアカウント/リージョンで初回のみ
@@ -84,7 +85,7 @@ cdk deploy
 
 Outputs の `FunctionUrl`（例: `https://xxxx.lambda-url.us-west-2.on.aws/`）を控える。
 
-> このプロジェクトは **us-west-2** にデプロイする前提です（Grok 4.6 の提供リージョンに合わせ、BedrockをIn-Regionで直接呼ぶ構成）。`cdk bootstrap` も us-west-2 で実行してください。
+> このプロジェクトは **us-west-2** にデプロイする前提です（Bedrock のモデル提供リージョンに合わせた構成）。`cdk bootstrap` も us-west-2 で実行してください。
 
 ## E. Backlog側の準備
 
@@ -136,7 +137,7 @@ https://account.line.biz/ → 対象アカウント → 右上「設定」→「
 | LIFFが「グループ内で開いてください」 | LIFF URLを**グループトーク内のリンクから**開いたか（外部ブラウザ直開きは不可） |
 | LIFFが真っ白・初期化失敗 | エンドポイントURLが `…/admin` と完全一致か（liff.initはエンドポイント以下の階層でのみ動作） |
 | 設定保存で「Backlog接続に失敗」 | スペースURL末尾スラッシュ / APIキー権限 / プロジェクトキー大文字 |
-| Grokが応答しない | us-west-2 でモデルアクセス有効化済みか / LambdaのIAMに bedrock:InvokeModel があるか |
+| AI整形が応答しない | us-west-2 でモデルアクセス有効化済みか / LambdaのIAMに bedrock:InvokeModel があるか（失敗時は未整形の下書きにフォールバック） |
 
 ## SSMパラメータ一覧
 
