@@ -259,8 +259,8 @@ async function onText(
       await store.putPending(awaiting.pendingId, pend);
       await line.lineReply(ctx.token, ev.replyToken, [
         line.buttonsTemplate('コメント確認', `以下の内容で ${pend.issueKey} にコメントしますか？\n\n${truncate(pend.text)}`, [
-          { label: '投稿する', data: `a=confirm_comment&p=${awaiting.pendingId}` },
-          { label: 'キャンセル', data: `a=cancel&p=${awaiting.pendingId}` },
+          { label: '投稿する', data: `a=confirm_comment&p=${awaiting.pendingId}`, displayText: '投稿する' },
+          { label: 'キャンセル', data: `a=cancel&p=${awaiting.pendingId}`, displayText: 'キャンセル' },
         ]),
       ]);
       return;
@@ -318,9 +318,9 @@ async function onText(
   await store.putPending(pid, { kind: 'intent', text: clean, userId });
   await line.lineReply(ctx.token, ev.replyToken, [
     line.buttonsTemplate('操作を選択', `このメッセージをどうしますか？\n\n${truncate(clean)}`, [
-      { label: '新規起票', data: `a=new&p=${pid}` },
-      { label: '既存課題にコメント', data: `a=comment&p=${pid}` },
-      { label: 'キャンセル', data: `a=cancel&p=${pid}` },
+      { label: '新規起票', data: `a=new&p=${pid}`, displayText: '新規起票' },
+      { label: '既存課題にコメント', data: `a=comment&p=${pid}`, displayText: '既存課題にコメント' },
+      { label: 'キャンセル', data: `a=cancel&p=${pid}`, displayText: 'キャンセル' },
     ]),
   ]);
 }
@@ -362,7 +362,16 @@ async function onPostback(
 
   switch (action) {
     case 'new': {
-      // Grok 4.6 でテンプレートに沿った下書きを生成（失敗時は未整形で継続）
+      if (pend.kind !== 'intent') {
+        await reply([line.textMsg('この下書きは既に生成中です')]);
+        return;
+      }
+      // 二重押し防止: 先にdraftへ遷移させる
+      pend.kind = 'draft';
+      await store.putPending(pid, pend);
+      await line.startLoading(ctx.token, groupId);
+
+      // Bedrock でテンプレートに沿った下書きを生成（失敗時は未整形で継続）
       const today = new Date().toLocaleDateString('sv-SE', {
         timeZone: 'Asia/Tokyo',
       });
@@ -401,7 +410,7 @@ async function onPostback(
 
       const liffId = await getParamOrNull('line/liff-id');
       const actions = [
-        { label: 'この内容で起票', data: `a=confirm_create&p=${pid}` },
+        { label: 'この内容で起票', data: `a=confirm_create&p=${pid}`, displayText: 'この内容で起票' },
         ...(liffId
           ? [
               {
@@ -410,7 +419,7 @@ async function onPostback(
               },
             ]
           : []),
-        { label: 'キャンセル', data: `a=cancel&p=${pid}` },
+        { label: 'キャンセル', data: `a=cancel&p=${pid}`, displayText: 'キャンセル' },
       ];
       await reply([
         line.buttonsTemplate(

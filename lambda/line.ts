@@ -35,9 +35,31 @@ export const lineReply = (
 export const linePush = (token: string, to: string, messages: unknown[]) =>
   post('/message/push', token, { to, messages });
 
+/** ローディングインジケータ（最大60秒。「送信中…」の表示用） */
+export async function startLoading(
+  token: string,
+  chatId: string,
+  seconds = 20,
+): Promise<void> {
+  await fetch(`${LINE_API}/chat/loading/start`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ chatId, loadingSeconds: seconds }),
+  }).catch(() => {});
+}
+
 export const textMsg = (text: string) => ({ type: 'text', text });
 
-type Action = { label: string; data?: string; uri?: string };
+type Action = {
+  label: string;
+  data?: string;
+  uri?: string;
+  /** postback 押下時にユーザー発言としてチャットに表示するテキスト */
+  displayText?: string;
+};
 
 /** ボタンテンプレート（postback / uri アクション。text は400文字制限） */
 export function buttonsTemplate(
@@ -54,7 +76,12 @@ export function buttonsTemplate(
       actions: actions.map((a) =>
         a.uri
           ? { type: 'uri', label: a.label, uri: a.uri }
-          : { type: 'postback', label: a.label, data: a.data },
+          : {
+              type: 'postback',
+              label: a.label,
+              data: a.data,
+              ...(a.displayText ? { displayText: a.displayText } : {}),
+            },
       ),
     },
   };
