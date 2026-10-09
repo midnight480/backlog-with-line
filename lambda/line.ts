@@ -75,17 +75,18 @@ export async function verifyIdToken(
   return json.sub ?? null;
 }
 
-/** ユーザーがそのグループのメンバーか確認（設定改ざん防止） */
+/** ユーザーがそのグループのメンバーか確認（設定改ざん防止）
+ *  注意: 未認証OAでは友だち追加済みメンバー以外が取れず失敗する場合がある */
 export async function isGroupMember(
   token: string,
   groupId: string,
   userId: string,
-): Promise<boolean> {
+): Promise<{ ok: boolean; status: number; body: string }> {
   const res = await fetch(
     `${LINE_API}/group/${encodeURIComponent(groupId)}/member/${encodeURIComponent(userId)}`,
     { headers: { Authorization: `Bearer ${token}` } },
   );
-  return res.ok;
+  return { ok: res.ok, status: res.status, body: await res.text() };
 }
 
 const profileCache = new Map<string, { name: string; at: number }>();

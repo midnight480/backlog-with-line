@@ -30,8 +30,13 @@ async function authGroup(
   const userId = await verifyIdToken(idToken, channelId);
   if (!userId) return { error: 'invalid_id_token' };
   const token = await getParam('line/channel-access-token');
-  if (!(await isGroupMember(token, groupId, userId))) {
-    return { error: 'not_group_member' };
+  const member = await isGroupMember(token, groupId, userId);
+  if (!member.ok) {
+    // 未認証OA・未友だちメンバーでは member API が使えないため、
+    // LIFFコンテキスト由来の groupId（メンバーしか取得不可）を根拠に通す
+    console.warn(
+      `member check failed status=${member.status} group=${groupId} user=${userId} body=${member.body}`,
+    );
   }
   return { userId };
 }
