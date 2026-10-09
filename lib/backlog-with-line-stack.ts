@@ -9,10 +9,10 @@ import type { Construct } from 'constructs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-// Bedrock は us-west-2 に集約。デフォルトは Moonshot Kimi K3（US推論プロファイル経由）
-// （xai.grok-4.6 はアカウントによって開放されないため。変更はここを書き換えて再デプロイ）
+// Bedrock は us-west-2 に集約。デフォルトは DeepSeek V3.2
+// （Bedrockサービス課金＝AWSクレジット対象。変更はここを書き換えて再デプロイ）
 const BEDROCK_REGION = 'us-west-2';
-const BEDROCK_MODEL_ID = 'us.moonshotai.kimi-k3';
+const BEDROCK_MODEL_ID = 'deepseek.v3.2';
 const PARAM_PREFIX = '/backlog-with-line';
 
 export class BacklogWithLineStack extends cdk.Stack {

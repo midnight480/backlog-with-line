@@ -6,7 +6,7 @@ import {
 const client = new BedrockRuntimeClient({
   region: process.env.BEDROCK_REGION ?? 'us-west-2',
 });
-const MODEL_ID = process.env.BEDROCK_MODEL_ID ?? 'us.moonshotai.kimi-k3';
+const MODEL_ID = process.env.BEDROCK_MODEL_ID ?? 'deepseek.v3.2';
 
 export interface IssueDraft {
   summary: string;
