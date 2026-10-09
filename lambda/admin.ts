@@ -83,10 +83,15 @@ adminApp.post('/api/connect', async (c) => {
 
   const spaceUrl = String(body.spaceUrl ?? '').replace(/\/$/, '');
   const projectKey = String(body.projectKey ?? '').toUpperCase();
-  if (!spaceUrl || !projectKey || !body.backlogApiKey) {
+  const apiKey =
+    body.backlogApiKey ||
+    (await getParamOrNull(`groups/${groupId}/backlog-api-key`));
+  if (!spaceUrl || !projectKey || !apiKey) {
     return c.json({ error: 'spaceUrl / projectKey / APIキーは必須です' }, 400);
   }
-  await putParam(`groups/${groupId}/backlog-api-key`, body.backlogApiKey);
+  if (body.backlogApiKey) {
+    await putParam(`groups/${groupId}/backlog-api-key`, body.backlogApiKey);
+  }
 
   const prev = await getGroupConfig(groupId);
   const cfg: GroupConfig = {
@@ -274,12 +279,12 @@ const ERR_JA = {
 const msg = (t, err) => '<div class="msg'+(err?' err':'')+'">'+esc(ERR_JA[t]||t)+'</div>';
 
 // ---- Step1: 接続テスト ----
-function renderConnect(cfg) {
+function renderConnect(cfg, hasApiKey) {
   app.innerHTML = '<h1>Backlog連携 設定</h1>'
     + '<p style="font-size:13px;color:#555">まず Backlog との接続を確認します</p>'
     + '<form>'
     + field('Backlog スペースURL','spaceUrl',cfg.spaceUrl,'url','https://xxx.backlog.com')
-    + field('Backlog APIキー','backlogApiKey','','password')
+    + field('Backlog APIキー'+(hasApiKey?'（設定済・変更時のみ入力）':''),'backlogApiKey','','password')
     + field('プロジェクトキー','projectKey',cfg.projectKey,'text','SAGA')
     + '<button type="submit">接続テスト</button></form><div id="out"></div>';
   $('form').onsubmit = async (e) => {
@@ -321,7 +326,7 @@ function renderDetail(cfg, meta, webhookUrl) {
     $('#out').innerHTML = j.error ? msg(j.error, true) : '<div class="msg">保存しました\\nWebhook URL: '+esc(j.webhookUrl)+'</div>';
     if (!j.error) renderSettings();
   };
-  $('#reconnect').onclick = () => renderConnect(cfg);
+  $('#reconnect').onclick = () => renderConnect(cfg, true);
 }
 
 async function renderSettings() {
@@ -329,7 +334,7 @@ async function renderSettings() {
   const res = await fetch('/admin/api/config?'+q);
   const data = await res.json();
   if (data.error) { app.innerHTML = msg(data.error, true); return; }
-  if (!data.config) { renderConnect({}); return; }
+  if (!data.config) { renderConnect({}, data.hasApiKey); return; }
   renderDetail(data.config, data.meta || {}, data.webhookUrl);
 }
 
