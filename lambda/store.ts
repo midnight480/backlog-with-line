@@ -38,6 +38,7 @@ export interface Pending {
   description?: string;
   dueDate?: string | null;
   issueKey?: string;
+  aiFormatted?: boolean;
 }
 
 async function getItem<T>(pk: string): Promise<T | undefined> {

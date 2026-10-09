@@ -182,6 +182,7 @@ async function resolveMirrorIssue(
   const issue = await backlog.createIssue(cfg, {
     summary: `LINEログ ${label}`,
     description: 'この課題にはLINEグループの発言が自動記録されます。',
+    footer: backlog.MIRROR_FOOTER,
   });
   cfg.mirrorLogIssueKey = issue.issueKey as string;
   cfg.mirrorLogPeriod = label;
@@ -361,21 +362,41 @@ async function onPostback(
 
   switch (action) {
     case 'new': {
-      // Grok 4.6 でテンプレートに沿った下書きを生成
+      // Grok 4.6 でテンプレートに沿った下書きを生成（失敗時は未整形で継続）
       const today = new Date().toLocaleDateString('sv-SE', {
         timeZone: 'Asia/Tokyo',
       });
-      const draft = await draftIssue(String(pend.text), {
-        today,
-        template: cfg.template,
-      });
+      let draft: {
+        summary?: string;
+        description?: string;
+        dueDate?: string | null;
+      };
+      let draftWarn = '';
+      try {
+        draft = await draftIssue(String(pend.text), {
+          today,
+          template: cfg.template,
+        });
+      } catch (e) {
+        console.error('grok draft failed', e);
+        draftWarn = '※AI整形に失敗したため未整形の下書きです\n';
+        const t = String(pend.text);
+        draft = {
+          summary: t.split('\n')[0].slice(0, 80) || 'LINEからの起票',
+          description: t,
+        };
+      }
       const due =
         draft.dueDate ??
         (cfg.dueDays
           ? new Date(Date.now() + cfg.dueDays * 86400000)
               .toLocaleDateString('sv-SE', { timeZone: 'Asia/Tokyo' })
           : null);
-      Object.assign(pend, draft, { kind: 'draft' as const, dueDate: due });
+      Object.assign(pend, draft, {
+        kind: 'draft' as const,
+        dueDate: due,
+        aiFormatted: !draftWarn,
+      });
       await store.putPending(pid, pend);
 
       const liffId = await getParamOrNull('line/liff-id');
@@ -394,7 +415,7 @@ async function onPostback(
       await reply([
         line.buttonsTemplate(
           '起票プレビュー',
-          `【起票プレビュー】\n件名: ${draft.summary}\n期限: ${due ?? '未設定'}\n詳細:\n${truncate(draft.description, 250)}`,
+          `${draftWarn}【起票プレビュー】\n件名: ${draft.summary}\n期限: ${due ?? '未設定'}\n詳細:\n${truncate(draft.description, 250)}`,
           actions,
         ),
       ]);
@@ -418,6 +439,7 @@ async function onPostback(
         summary: String(pend.summary),
         description: String(pend.description),
         dueDate: pend.dueDate ?? null,
+        footer: pend.aiFormatted ? undefined : backlog.MIRROR_FOOTER,
       });
       await store.delPending(pid);
       const res = await reply([

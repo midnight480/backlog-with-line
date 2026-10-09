@@ -63,14 +63,17 @@ export interface IssueInput {
   assigneeId?: number;
 }
 
-export async function createIssue(cfg: GroupConfig, d: IssueInput) {
+export async function createIssue(
+  cfg: GroupConfig,
+  d: IssueInput & { footer?: string },
+) {
   const projectId = await resolveProjectId(cfg);
   const issueTypeId = d.issueTypeId ?? cfg.issueTypeId;
   if (!issueTypeId) throw new Error('issueTypeId が未設定です');
   const body: Record<string, string> = {
     projectId: String(projectId),
     summary: d.summary,
-    description: d.description + FOOTER,
+    description: d.description + (d.footer ?? FOOTER),
     issueTypeId: String(issueTypeId),
     priorityId: String(d.priorityId ?? cfg.priorityId ?? 3),
   };
