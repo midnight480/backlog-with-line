@@ -15,53 +15,52 @@
 
 ---
 
-## A. プロバイダーとチャネルの作成
+## A. プロバイダーと公式アカウントの作成
+
+> 2026年時点、LINE DevelopersコンソールからMessaging APIチャネルを直接作ることはできません。先にLINE公式アカウントを作り、Official Account ManagerでMessaging APIを有効化します。
 
 1. https://developers.line.biz/console/ を開き、LINEアカウントでログイン
-2. **プロバイダー**を作成（なければ）。名前は自由（例: `personal-dev`）
-3. プロバイダーのページで **「新規チャネル作成」→「Messaging API」** を選択
-4. 入力して作成：
-   - チャネル名（例: `backlog-with-line`）
-   - チャネル説明
-   - 大業種・小業種（個人利用なら「個人」系で可）
-   - メールアドレス
-   - プライバシーポリシーURL・利用規約URLは任意
-5. 作成直後に表示される利用規約に同意
+2. **プロバイダー**を作成。**名前に「line」を含めると予約語エラー**になるので注意（例: `backlog-integration`）
+3. プロバイダーのページで「Create a Messaging API channel」→「Create a LINE Official Account」から公式アカウント作成フォームへ
+   - アカウント名（**「LINE」を含む名前は不可**。例: `Backlog連携bot`）
+   - メールアドレス / 業種（個人なら大業種「個人」→ 小業種は任意）/ 運用目的 / 主な使い方
+   - LINE公式アカウント利用規約・ビジネスマネージャー利用規約に同意（ビジネスマネージャー組織が自動作成される）
+4. Official Account Manager（https://manager.line.biz/）で初回ログイン時の同意画面（情報利用・LINEヤフーグループへの情報提供）に同意
+5. 「設定」→「Messaging API」→「Messaging APIを利用する」→ 手順2のプロバイダーを選択（**後から変更不可**）→ API利用規約に同意
 
 ### ここで控える値
 
-チャネルページの **「チャネル基本設定」タブ**：
-
 | 値 | 場所 | SSMパラメータ名 |
 |---|---|---|
-| チャネルID | 上部の基本情報欄 | `/backlog-with-line/line/channel-id` |
-| チャネルシークレット | 基本情報欄（表示ボタン） | `/backlog-with-line/line/channel-secret` |
+| チャネルシークレット | OA Manager「Messaging API」画面 / Developersコンソール「Basic settings」 | `/backlog-with-line/line/channel-secret` |
 
-## B. Messaging API設定タブ
+> Messaging APIチャネルの **Channel ID はSSMに入れません**（`line/channel-id` は次のC項のLINE LoginチャネルIDを使う）。
 
-チャネルページの **「Messaging API設定」タブ** で以下を実施：
+## B. Messaging API設定
 
-1. **チャネルアクセストークン**：「チャネルアクセストークン（長期）」→「発行」→ 有効期限を選んで発行 → 値を控える
+1. Developersコンソールの Messaging APIチャネル →「Messaging API」タブ →**チャネルアクセストークン（長期）**を「発行」→ 値を控える
    - SSM: `/backlog-with-line/line/channel-access-token`
-2. **「グループトーク・複数人トークへの参加を許可する」をON**（デフォルトOFF。**これを忘れるとボットをグループに招待できません**）
-3. **Webhook URL**：デプロイ後に戻ってきて設定（→ F項）
-4. ページ下部「応答メッセージ」「あいさつメッセージ」は LINE Official Account Manager へのリンク。後でOFFにする（→ G項）
+2. OA Manager「設定」→「アカウント設定」→**「グループ・複数人トークへの参加を許可する」**（デフォルトは不許可。**忘れるとボットをグループに招待できません**）
+3. Webhook URL：デプロイ後に設定（→ F項）
 
-ボットのQRコード・ベーシックIDもこのタブにあります（友だち追加用）。
+ボットのQRコード・ベーシックIDは「Messaging API」タブにあります（友だち追加用）。
 
-## C. LIFF アプリの作成
+## C. LINE Loginチャネル + LIFF アプリの作成
 
-LIFFはMessaging APIチャネルの **「LIFF」タブ** から追加します。
+> **Messaging APIチャネルにはLIFFを追加できません**。同じプロバイダーにLINE Loginチャネルを作り、そこにLIFFを追加します（同じプロバイダーなのでユーザーIDはMessaging APIと一致する）。
 
-1. 「LIFF」タブ → 「追加」
-2. 入力：
-   - **LIFFアプリ名**：例 `Backlog連携設定`（「LINE」を含む名前は不可）
-   - **サイズ**：`Full`
-   - **エンドポイントURL**：この時点ではデプロイ先URLが未確定なので **`https://example.com` 等の仮URLでOK**（後で必ず本物に差し替え）
-   - **Scope**：**`openid` を必ずチェック**（`liff.getIDToken()` に必須。`profile` は任意でOK）
-   - ボットリンク機能・友だち追加オプション：不要
-3. 「追加」すると **LIFF ID**（例: `1234567890-AbcdEfgh`）と **LIFF URL**（`https://liff.line.me/1234567890-AbcdEfgh`）が発行される
-   - SSM: `/backlog-with-line/line/liff-id` にLIFF IDを入れる
+1. プロバイダーのページ →「Create a LINE Login channel」
+   - Region: Japan / チャネル名（例: `Backlog連携設定`）/ 説明 / App types: **Web app** / メールアドレス
+   - LINE Developers Agreement に同意して作成
+   - **Channel ID** を控える → SSM: `/backlog-with-line/line/channel-id`（LIFFのIDトークン検証の `client_id` に使う）
+2. 「LIFF」タブ →「Add」
+   - **LIFFアプリ名**：例 `Backlog連携設定`
+   - **Size**：`Full`
+   - **Endpoint URL**：`https://<FunctionUrl>/admin`（デプロイ前なら仮URLで作り、H項で差し替え）
+   - **Scopes**：**`openid` を必ずチェック**（`liff.getIDToken()` に必須）
+   - **Add friend option**：Off
+3. 発行された **LIFF ID**（例: `2011951725-AbcdEfgh`）→ SSM: `/backlog-with-line/line/liff-id`
+4. チャネル上部の「Developing」→**「Publish」**（開発中のままだとAdmin/テスター以外はLIFFを開けない。公開は取り消せない）
 
 ## D. AWS 側（先にここまで終わらせる）
 
@@ -95,7 +94,7 @@ Outputs の `FunctionUrl`（例: `https://xxxx.lambda-url.us-west-2.on.aws/`）�
 
 ## F. コンソールに戻る：Webhook URL
 
-1. チャネルの **「Messaging API設定」タブ →「Webhook設定」**
+1. Messaging APIチャネルの **「Messaging API」タブ →「Webhook settings」**
 2. **Webhook URL** に `https://<FunctionUrl>/webhook/line` を入力 → 「更新」
 3. 「検証」ボタンで「成功」が出ることを確認（失敗する場合はSSMのchannel-secret未設定 or URL間違い）
 4. **「Webhookの利用」をON**
@@ -110,7 +109,7 @@ https://account.line.biz/ → 対象アカウント → 右上「設定」→「
 
 ## H. LIFF エンドポイントの本設定
 
-1. チャネルの「LIFF」タブ → 作ったアプリを選択
+1. **LINE Loginチャネル**の「LIFF」タブ → 作ったアプリを選択（C項で本番URLを入れていればこの項は不要）
 2. **エンドポイントURL** を `https://<FunctionUrl>/admin` に変更（末尾スラッシュなし）
 3. 保存
 
@@ -143,8 +142,8 @@ https://account.line.biz/ → 対象アカウント → 右上「設定」→「
 
 | パス | 種別 | どこで取る/入れる |
 |---|---|---|
-| `/backlog-with-line/line/channel-id` | String | チャネル基本設定タブ |
-| `/backlog-with-line/line/channel-secret` | SecureString | チャネル基本設定タブ |
+| `/backlog-with-line/line/channel-id` | String | **LINE Loginチャネル**の Basic settings（Messaging APIのIDではない） |
+| `/backlog-with-line/line/channel-secret` | SecureString | Messaging APIチャネルの Basic settings |
 | `/backlog-with-line/line/channel-access-token` | SecureString | Messaging API設定タブで発行 |
-| `/backlog-with-line/line/liff-id` | String | LIFFタブで発行 |
+| `/backlog-with-line/line/liff-id` | String | LINE LoginチャネルのLIFFタブで発行 |
 | `/backlog-with-line/groups/{groupId}/backlog-api-key` | SecureString | LIFF設定画面から自動登録（手動でも可） |

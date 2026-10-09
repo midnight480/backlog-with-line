@@ -216,7 +216,7 @@ const formVals = () => Object.fromEntries(new FormData($('form')).entries());
 
 async function renderSettings() {
   const q = new URLSearchParams({ groupId, idToken });
-  const data = await (await fetch('api/config?'+q)).json();
+  const data = await (await fetch('/admin/api/config?'+q)).json();
   const cfg = data.config || {};
   const meta = data.meta || {};
   app.innerHTML = '<h1>Backlog連携 設定</h1>'
@@ -238,7 +238,7 @@ async function renderSettings() {
     + (data.webhookUrl ? '<h2>Backlog Webhook URL</h2><div class="msg">'+esc(data.webhookUrl)+'</div><p style="font-size:12px;color:#777">Backlogプロジェクト設定 → Webhook に登録してください</p>' : '');
   $('form').onsubmit = async (e) => {
     e.preventDefault();
-    const res = await fetch('api/config', { method:'POST', headers:{'Content-Type':'application/json'},
+    const res = await fetch('/admin/api/config', { method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({ idToken, groupId, ...formVals(), notifyComment: !!$('[name=notifyComment]')?.checked }) });
     const j = await res.json();
     $('#out').innerHTML = '<div class="msg'+(j.error?' err':'')+'">'+esc(j.error||('保存しました\\nWebhook URL: '+j.webhookUrl))+'</div>';
@@ -248,7 +248,7 @@ async function renderSettings() {
 
 async function renderDraft(draftId) {
   const q = new URLSearchParams({ id: draftId, groupId, idToken });
-  const data = await (await fetch('api/draft?'+q)).json();
+  const data = await (await fetch('/admin/api/draft?'+q)).json();
   if (data.error) { app.innerHTML = '<div class="msg err">'+esc(data.error)+'</div>'; return; }
   const d = data.draft, meta = data.meta || {}, cfg = data.config || {};
   app.innerHTML = '<h1>起票内容の編集</h1>'
@@ -262,7 +262,7 @@ async function renderDraft(draftId) {
     + '<button type="submit">この内容で起票</button></form><div id="out"></div>';
   $('form').onsubmit = async (e) => {
     e.preventDefault();
-    const res = await fetch('api/draft/submit', { method:'POST', headers:{'Content-Type':'application/json'},
+    const res = await fetch('/admin/api/draft/submit', { method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({ id: draftId, idToken, groupId, ...formVals() }) });
     const j = await res.json();
     $('#out').innerHTML = '<div class="msg'+(j.error?' err':'')+'">'+esc(j.error||('起票しました: '+j.issueKey))+'</div>';
