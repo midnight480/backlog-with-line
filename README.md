@@ -15,7 +15,7 @@ LIFF(管理画面) ◀──/admin─────┘                  └──�
 - **Lambda + Function URL**：`AUTH_TYPE=NONE` の公開エンドポイント。入り口で `X-Line-Signature`（HMAC-SHA256 + チャネルシークレット）を検証し、不一致は 401 で即破棄
 - **DynamoDB**（シングルテーブル・TTL 付き）：`GROUP#` 設定 / `PENDING#` 確認待ち / `AWAIT#` 入力待ち / `MSG#` メッセージ→課題紐付け / `SEEN#` 冪等化 / `WBTOKEN#` Webhook トークン逆引き
 - **SSM Parameter Store**：LINE チャネル情報と Backlog API キー（SecureString + KMS 暗号化）
-- **LIFF**：グループ ↔ プロジェクト紐付け設定画面と起票フォーム（`liff.getContext()` で groupId を取得）
+- **LIFF**：グループ ↔ プロジェクト紐付けの2段階設定画面（接続テスト→詳細設定）と起票フォーム。ボット投稿リンクの `?group=` でWebhook系groupIdを紐付ける
 
 ## 使い方
 
@@ -31,6 +31,9 @@ LIFF(管理画面) ◀──/admin─────┘                  └──�
 
 ボットの起票/通知メッセージに「返信」→ その課題へ直接コメント追記
 Backlog でコメント → グループへプッシュ通知（APIキー所有者自身のコメントは通知しない）
+
+※ボタン押下時は押したボタン名が発言として表示され（displayText）、
+AI生成中はローディングインジケータが出る（二重押しは無視）
 ```
 
 ## 全発言ミラー

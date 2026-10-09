@@ -119,10 +119,9 @@ https://account.line.biz/ → 対象アカウント → 右上「設定」→「
 1. ボットを**友だち追加**（Messaging API設定タブのQRコードから）
 2. 対象のLINEグループを開く → 右上メニュー →「招待」→ ボットを選択（友だち追加済みのメンバーなら誰でも招待可。**1グループに入れる公式アカウントは1つまで**）
 3. ボットが参加すると挨拶メッセージ＋設定用LIFF URLが投稿される
-4. LIFF URLを開いて設定：
-   - Backlog スペースURL（`https://xxx.backlog.com`）
-   - **Backlog APIキー**（Eで発行したもの → SSM SecureStringとして保存される）
-   - プロジェクトキー・課題タイプ・優先度・デフォルト担当者
+4. LIFF URLを開いて設定（2段階）：
+   - **Step1 接続テスト**：スペースID（`https://xxx.backlog.com` の `xxx` のみ入力）＋ ドメイン（`.backlog.com` / `.backlog.jp` をプルダウンで選択）＋ **Backlog APIキー**（Eで発行したもの → SSM SecureStringとして保存される）＋ プロジェクトキー →「接続テスト」
+   - **Step2 詳細設定**：接続成功後、Backlogから取得した選択肢（課題タイプ・優先度・プロジェクトメンバー）で設定。期限初期値・起票テンプレート・コメント通知・ミラー設定もここ
    - 保存成功すると **Backlog Webhook URL** が表示される
 5. Backlogプロジェクト設定 → **Webhook** → 表示されたURL（`https://<FunctionUrl>/webhook/backlog/<token>`）を登録。イベントは「コメント」だけでOK
 6. グループで `@bot テストです` → ボタンが出れば完成
@@ -136,7 +135,8 @@ https://account.line.biz/ → 対象アカウント → 右上「設定」→「
 | メンションしても無反応 | Webhook利用ON / 応答メッセージOFF / CloudWatch Logsで署名エラー確認 |
 | LIFFが「グループ内で開いてください」 | LIFF URLを**グループトーク内のリンクから**開いたか（外部ブラウザ直開きは不可） |
 | LIFFが真っ白・初期化失敗 | エンドポイントURLが `…/admin` と完全一致か（liff.initはエンドポイント以下の階層でのみ動作） |
-| 設定保存で「Backlog接続に失敗」 | スペースURL末尾スラッシュ / APIキー権限 / プロジェクトキー大文字 |
+| 接続テストで「Backlog接続に失敗」 | スペースIDのタイポ / APIキー権限 / プロジェクトキー大文字 |
+| ボタンを押しても何も表示されない | 通常は押下したボタン名がチャットに表示される。出ない場合はCloudWatch Logsを確認（AI生成中はローディング表示になる） |
 | AI整形が応答しない | us-west-2 でモデルアクセス有効化済みか / LambdaのIAMに bedrock:InvokeModel があるか（失敗時は未整形の下書きにフォールバック） |
 
 ## SSMパラメータ一覧
