@@ -34,12 +34,24 @@ app.post('/webhook/backlog/:token', async (c) => {
   if (!cfg) return c.json({ error: 'unknown token' }, 404);
 
   const payload = await c.req.json();
+  console.log(
+    'backlog webhook',
+    JSON.stringify({
+      type: payload.type,
+      commenter:
+        payload.createdUser?.id ?? payload.content?.comment?.createdUser?.id,
+      notifyTypes: cfg.notifyTypes,
+    }),
+  );
   if (!cfg.notifyTypes?.includes(payload.type)) {
     return c.json({ ok: true, skipped: 'type' });
   }
   // ボット自身(APIキー所有者)のコメントはループするので通知しない
+  const actorId =
+    payload.createdUser?.id ?? payload.content?.comment?.createdUser?.id;
   const me = await backlog.getMyself(cfg).catch(() => null);
-  if (me && payload.content?.createdUser?.id === me.id) {
+  if (me && actorId === me.id) {
+    console.log(`backlog webhook skipped: self (me=${me.id})`);
     return c.json({ ok: true, skipped: 'self' });
   }
 
