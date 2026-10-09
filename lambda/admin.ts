@@ -280,10 +280,19 @@ const msg = (t, err) => '<div class="msg'+(err?' err':'')+'">'+esc(ERR_JA[t]||t)
 
 // ---- Step1: 接続テスト ----
 function renderConnect(cfg, hasApiKey) {
+  const m = String(cfg.spaceUrl||'').match(/https?:\\/\\/([^.]+)\\.(backlog\\.(?:com|jp))/);
+  const spaceId = m ? m[1] : '';
+  const domain = m ? m[2] : 'backlog.com';
   app.innerHTML = '<h1>Backlog連携 設定</h1>'
     + '<p style="font-size:13px;color:#555">まず Backlog との接続を確認します</p>'
     + '<form>'
-    + field('Backlog スペースURL','spaceUrl',cfg.spaceUrl,'url','https://xxx.backlog.com')
+    + '<label>Backlog スペースID</label>'
+    + '<div style="display:flex;gap:6px;align-items:center">'
+    + '<input name="spaceId" type="text" value="'+esc(spaceId)+'" placeholder="xxx" style="flex:1">'
+    + '<select name="spaceDomain" style="width:auto">'
+    + '<option value="backlog.com"'+(domain==='backlog.com'?' selected':'')+'>.backlog.com</option>'
+    + '<option value="backlog.jp"'+(domain==='backlog.jp'?' selected':'')+'>.backlog.jp</option>'
+    + '</select></div>'
     + field('Backlog APIキー'+(hasApiKey?'（設定済・変更時のみ入力）':''),'backlogApiKey','','password')
     + field('プロジェクトキー','projectKey',cfg.projectKey,'text','SAGA')
     + '<button type="submit">接続テスト</button></form><div id="out"></div>';
@@ -291,11 +300,12 @@ function renderConnect(cfg, hasApiKey) {
     e.preventDefault();
     $('#out').innerHTML = '接続中...';
     const v = formVals();
+    const spaceUrl = 'https://' + String(v.spaceId||'').trim() + '.' + v.spaceDomain;
     const res = await fetch('/admin/api/connect', { method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ idToken, groupId, ...v }) });
+      body: JSON.stringify({ idToken, groupId, spaceUrl, projectKey: v.projectKey, backlogApiKey: v.backlogApiKey }) });
     const j = await res.json();
     if (j.error) { $('#out').innerHTML = msg(j.error, true); return; }
-    renderDetail({ spaceUrl: v.spaceUrl.replace(/[/]+$/,''), projectKey: v.projectKey.toUpperCase() }, j.meta, j.webhookUrl);
+    renderDetail({ spaceUrl, projectKey: String(v.projectKey||'').toUpperCase() }, j.meta, j.webhookUrl);
   };
 }
 
