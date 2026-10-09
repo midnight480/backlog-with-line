@@ -6,8 +6,7 @@ import {
 const client = new BedrockRuntimeClient({
   region: process.env.BEDROCK_REGION ?? 'us-west-2',
 });
-const MODEL_ID =
-  process.env.BEDROCK_MODEL_ID ?? 'us.anthropic.claude-haiku-4-5-20251001-v1:0';
+const MODEL_ID = process.env.BEDROCK_MODEL_ID ?? 'us.moonshotai.kimi-k3';
 
 export interface IssueDraft {
   summary: string;

@@ -65,7 +65,7 @@
 ## D. AWS 側（先にここまで終わらせる）
 
 ```bash
-# Bedrock コンソール(us-west-2) → モデルアクセス → Claude Haiku 4.5 を有効化（初回のみ・数分で反映）
+# Bedrock コンソール(us-west-2) → モデルアクセス → Moonshot Kimi K3 を有効化（初回のみ・数分で反映）
 # （xAI Grok 4.6 はアカウントによって開放されないため。使える場合は lib の BEDROCK_MODEL_ID を変更）
 # https://us-west-2.console.aws.amazon.com/bedrock/home?region=us-west-2#/modelaccess
 
